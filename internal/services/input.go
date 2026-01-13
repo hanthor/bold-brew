@@ -37,11 +37,12 @@ type InputServiceInterface interface {
 
 // InputService implements the InputServiceInterface and handles key events for the application.
 type InputService struct {
-	appService    *AppService
-	layout        ui.LayoutInterface
-	brewService   BrewServiceInterface
-	keyActions    []*InputAction
-	legendEntries []struct{ KeySlug, Name string }
+	appService     *AppService
+	layout         ui.LayoutInterface
+	brewService    BrewServiceInterface
+	flatpakService FlatpakServiceInterface
+	keyActions     []*InputAction
+	legendEntries  []struct{ KeySlug, Name string }
 
 	// Actions for each key input
 	ActionSearch          *InputAction
@@ -63,11 +64,12 @@ type InputService struct {
 	ActionToggleSelection *InputAction
 }
 
-var NewInputService = func(appService *AppService, brewService BrewServiceInterface) InputServiceInterface {
+var NewInputService = func(appService *AppService, brewService BrewServiceInterface, flatpakService FlatpakServiceInterface) InputServiceInterface {
 	s := &InputService{
-		appService:  appService,
-		layout:      appService.GetLayout(),
-		brewService: brewService,
+		appService:     appService,
+		layout:         appService.GetLayout(),
+		brewService:    brewService,
+		flatpakService: flatpakService,
 	}
 
 	// Initialize actions with key bindings and handlers
@@ -370,7 +372,14 @@ func (s *InputService) handleInstallPackageEvent() {
 				s.layout.GetOutput().Clear()
 				go func() {
 					s.layout.GetNotifier().ShowWarning(fmt.Sprintf("Installing %s...", info.Name))
-					if err := s.brewService.InstallPackage(info, s.appService.app, s.layout.GetOutput().View()); err != nil {
+					var err error
+					if info.Type == models.PackageTypeFlatpak {
+						err = s.flatpakService.InstallPackage(info, s.appService.app, s.layout.GetOutput().View())
+					} else {
+						err = s.brewService.InstallPackage(info, s.appService.app, s.layout.GetOutput().View())
+					}
+
+					if err != nil {
 						s.layout.GetNotifier().ShowError(fmt.Sprintf("Failed to install %s", info.Name))
 						return
 					}
@@ -400,7 +409,14 @@ func (s *InputService) handleRemovePackageEvent() {
 				s.layout.GetOutput().Clear()
 				go func() {
 					s.layout.GetNotifier().ShowWarning(fmt.Sprintf("Removing %s...", info.Name))
-					if err := s.brewService.RemovePackage(info, s.appService.app, s.layout.GetOutput().View()); err != nil {
+					var err error
+					if info.Type == models.PackageTypeFlatpak {
+						err = s.flatpakService.RemovePackage(info, s.appService.app, s.layout.GetOutput().View())
+					} else {
+						err = s.brewService.RemovePackage(info, s.appService.app, s.layout.GetOutput().View())
+					}
+
+					if err != nil {
 						s.layout.GetNotifier().ShowError(fmt.Sprintf("Failed to remove %s", info.Name))
 						return
 					}
@@ -430,7 +446,14 @@ func (s *InputService) handleUpdatePackageEvent() {
 				s.layout.GetOutput().Clear()
 				go func() {
 					s.layout.GetNotifier().ShowWarning(fmt.Sprintf("Updating %s...", info.Name))
-					if err := s.brewService.UpdatePackage(info, s.appService.app, s.layout.GetOutput().View()); err != nil {
+					var err error
+					if info.Type == models.PackageTypeFlatpak {
+						err = s.flatpakService.UpdatePackage(info, s.appService.app, s.layout.GetOutput().View())
+					} else {
+						err = s.brewService.UpdatePackage(info, s.appService.app, s.layout.GetOutput().View())
+					}
+
+					if err != nil {
 						s.layout.GetNotifier().ShowError(fmt.Sprintf("Failed to update %s", info.Name))
 						return
 					}
@@ -593,6 +616,9 @@ func (s *InputService) handleInstallAllPackagesEvent() {
 		skipCondition: func(pkg models.Package) bool { return pkg.LocallyInstalled },
 		skipReason:    "already installed",
 		execute: func(pkg models.Package) error {
+			if pkg.Type == models.PackageTypeFlatpak {
+				return s.flatpakService.InstallPackage(pkg, s.appService.app, s.layout.GetOutput().View())
+			}
 			return s.brewService.InstallPackage(pkg, s.appService.app, s.layout.GetOutput().View())
 		},
 	})
@@ -606,6 +632,9 @@ func (s *InputService) handleRemoveAllPackagesEvent() {
 		skipCondition: func(pkg models.Package) bool { return !pkg.LocallyInstalled },
 		skipReason:    "not installed",
 		execute: func(pkg models.Package) error {
+			if pkg.Type == models.PackageTypeFlatpak {
+				return s.flatpakService.RemovePackage(pkg, s.appService.app, s.layout.GetOutput().View())
+			}
 			return s.brewService.RemovePackage(pkg, s.appService.app, s.layout.GetOutput().View())
 		},
 	})

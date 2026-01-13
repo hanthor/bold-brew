@@ -47,6 +47,7 @@ type AppService struct {
 	installedTaps    []string // Taps installed by this session (for cleanup)
 
 	brewService       BrewServiceInterface
+	flatpakService    FlatpakServiceInterface
 	dataProvider      DataProviderInterface // Direct access for Brewfile operations
 	selfUpdateService SelfUpdateServiceInterface
 	inputService      InputServiceInterface
@@ -75,7 +76,8 @@ var NewAppService = func() AppServiceInterface {
 	// Initialize services
 	s.dataProvider = NewDataProvider()
 	s.brewService = NewBrewService()
-	s.inputService = NewInputService(s, s.brewService)
+	s.flatpakService = NewFlatpakService()
+	s.inputService = NewInputService(s, s.brewService, s.flatpakService)
 	s.selfUpdateService = NewSelfUpdateService()
 
 	return s
